@@ -118,6 +118,7 @@ module fv_io_mod
 
   use fv_mp_mod,               only: mp_gather, is_master
   use fv_treat_da_inc_mod,     only: read_da_inc
+  use module_diag_hailcast,    only: do_hailcast, hailcast_wdur, hailcast_wup_mask
 
   implicit none
   private
@@ -425,6 +426,14 @@ contains
           call register_restart_field(Atm%Tra_restart, tracer_name, Atm%qdiag(:,:,:,nt), &
                        dim_names_4d, chunksizes=chunksizes_4d, is_optional=.true.)
        enddo
+
+    ! fname = 'fv_diag.res'//trim(stile_name)//'.nc
+    elseif (Atm%Diag_restart_is_open) then
+       call fv_io_register_axis(Atm%Diag_restart, numx=numx, numy=numy, xpos=xpos, ypos=ypos)
+       call get_dim_chunksizes(Atm%Diag_restart, dim_names_3d2, chunksizes_3d2)
+
+       call register_restart_field(Atm%Diag_restart, 'hailcast_wdur', hailcast_wdur, dim_names_3d2, chunksizes=chunksizes_3d2)
+       call register_restart_field(Atm%Diag_restart, 'hailcast_wup_mask', hailcast_wup_mask, dim_names_3d2, chunksizes=chunksizes_3d2)
     endif
   end subroutine  fv_io_register_restart
   ! </SUBROUTINE> NAME="fv_io_register_restart"
@@ -559,6 +568,20 @@ contains
            call read_restart(Atm(1)%Lnd_restart, ignore_checksum=Atm(1)%flagstruct%ignore_rst_cksum)
            call close_file(Atm(1)%Lnd_restart)
            Atm(1)%Lnd_restart_is_open = .false.
+         else
+           call mpp_error(NOTE,'==> Warning from fv_read_restart: Expected file '//trim(fname)//' does not exist')
+         endif
+    endif
+
+    if ( do_hailcast ) then
+!--- restore data for fv_diag - if it exists
+         fname = 'INPUT/fv_diag.res'//trim(suffix)//'.nc'
+         Atm(1)%Diag_restart_is_open = open_file(Atm(1)%Diag_restart, fname, "read", fv_domain, is_restart=.true.)
+         if (Atm(1)%Diag_restart_is_open) then
+           call fv_io_register_restart(Atm(1))
+           call read_restart(Atm(1)%Diag_restart, ignore_checksum=Atm(1)%flagstruct%ignore_rst_cksum)
+           call close_file(Atm(1)%Diag_restart)
+           Atm(1)%Diag_restart_is_open = .false.
          else
            call mpp_error(NOTE,'==> Warning from fv_read_restart: Expected file '//trim(fname)//' does not exist')
          endif
@@ -975,6 +998,21 @@ contains
        call write_restart(Atm%Tra_restart)
        call close_file(Atm%Tra_restart)
        Atm%Tra_restart_is_open = .false.
+    endif
+
+    if ( do_hailcast ) then
+       if (present(timestamp)) then
+         fname = 'RESTART/'//trim(timestamp)//'.fv_diag.res'//trim(suffix)//'.nc'
+       else
+         fname = 'RESTART/fv_diag.res'//trim(suffix)//'.nc'
+       endif
+       Atm%Diag_restart_is_open = open_file(Atm%Diag_restart, fname, "overwrite", fv_domain, is_restart=.true.)
+       if (Atm%Diag_restart_is_open) then
+          call fv_io_register_restart(Atm)
+          call write_restart(Atm%Diag_restart)
+          call close_file(Atm%Diag_restart)
+          Atm%Diag_restart_is_open = .false.
+       endif
     endif
 
   end subroutine  fv_io_write_restart
