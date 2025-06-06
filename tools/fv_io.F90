@@ -92,8 +92,10 @@ module fv_io_mod
                                      write_restart_bc, close_file, register_field, write_data, &
                                      get_global_io_domain_indices, register_variable_attribute, &
                                      variable_exists, read_data, set_filename_appendix, get_dimension_size
+  use fms_mod,                 only: check_nml_error
   use mpp_mod,                 only: mpp_error, FATAL, NOTE, WARNING, mpp_root_pe, &
                                      mpp_sync, mpp_pe, mpp_declare_pelist, mpp_get_current_pelist, &
+                                     input_nml_file, &
 #ifdef ENABLE_PARALLELRESTART
                                      mpp_npes, MPP_COMM_NULL
 #else
@@ -458,8 +460,16 @@ contains
     type(domain2D) :: domain_for_read
     integer :: read_layout(2), layout(2)
 
+    integer              :: isdo, iedo, jsdo, jedo
+    integer              :: ios, ierr
+    namelist /fv_diagnostics_nml/ do_hailcast
+
     allocate(pes(mpp_npes()))
     call mpp_get_current_pelist(pes)
+
+    ! Read fv_diagnostics_nml
+    read (input_nml_file,fv_diagnostics_nml,iostat=ios)
+    ierr = check_nml_error(ios,'fv_diagnostics_nml')
 
     suffix = ''
     fname = 'INPUT/fv_core.res.nc'
@@ -578,6 +588,14 @@ contains
          fname = 'INPUT/fv_diag.res'//trim(suffix)//'.nc'
          Atm(1)%Diag_restart_is_open = open_file(Atm(1)%Diag_restart, fname, "read", fv_domain, is_restart=.true.)
          if (Atm(1)%Diag_restart_is_open) then
+           if (.not.allocated(hailcast_wdur)) then
+                isdo = Atm(1)%bd%isd; iedo = Atm(1)%bd%ied
+                jsdo = Atm(1)%bd%jsd; jedo = Atm(1)%bd%jed
+                allocate(hailcast_wdur(isdo:iedo,jsdo:jedo))
+                allocate(hailcast_wup_mask(isdo:iedo,jsdo:jedo))
+                hailcast_wdur = 0
+                hailcast_wup_mask = 0
+           endif
            call fv_io_register_restart(Atm(1))
            call read_restart(Atm(1)%Diag_restart, ignore_checksum=Atm(1)%flagstruct%ignore_rst_cksum)
            call close_file(Atm(1)%Diag_restart)
