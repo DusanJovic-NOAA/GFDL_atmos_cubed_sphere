@@ -3239,7 +3239,7 @@ contains
       call mp_reduce_max(qmax)
 
       if(master) then
-            write(*,*) qname//trim(gn), ' max = ', qmax*fac, ' min = ', qmin*fac
+            write(*,'(A,A,F20.10,A,F20.10)') qname//trim(gn), ' max = ', qmax*fac, ' min = ', qmin*fac
       endif
 
  end subroutine prt_maxmin

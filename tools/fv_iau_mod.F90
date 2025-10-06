@@ -59,6 +59,7 @@ module fv_iau_mod
   use fv_treat_da_inc_mod, only: remap_coef
   use tracer_manager_mod,  only: get_tracer_names,get_tracer_index, get_number_tracers
   use field_manager_mod,   only: MODEL_ATMOS
+  use fv_diagnostics_mod,  only: prt_maxmin
   implicit none
 
   private
@@ -471,6 +472,16 @@ subroutine read_iau_forcing(IPD_Control,increments,fname)
        call interp_inc(trim(tracer_names(l))//'_inc',increments%tracer_inc(:,:,:,l),jbeg,jend)
     enddo
     call close_ncfile(ncid)
+
+    call prt_maxmin(trim(fname)//' T_inc', increments%temp_inc, is, ie, js, je, 0, npz, 1.0)
+    call prt_maxmin(trim(fname)//' delp_inc', increments%delp_inc, is, ie, js, je, 0, npz, 1.0)
+    call prt_maxmin(trim(fname)//' delz_inc', increments%delz_inc, is, ie, js, je, 0, npz, 1.0)
+    call prt_maxmin(trim(fname)//' u_inc', increments%ua_inc, is, ie, js, je, 0, npz, 1.0)
+    call prt_maxmin(trim(fname)//' v_inc', increments%va_inc, is, ie, js, je, 0, npz, 1.0)
+    do l=1,ntracers
+       call prt_maxmin(trim(fname)//' '//trim(tracer_names(l))//'_inc',increments%tracer_inc(:,:,:,l), is, ie, js, je, 0, npz, 1.0)
+    enddo
+
     deallocate (wk3)
 
 
